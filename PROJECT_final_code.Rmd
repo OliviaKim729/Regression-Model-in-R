@@ -1,0 +1,253 @@
+---
+title: "IE 7280 PROJECT"
+author: "Alican Yilmaz"
+date: "11/25/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE, purl=TRUE}
+knitr::opts_chunk$set(echo = TRUE)
+library("data.table")
+
+```
+
+## Read data
+
+
+```{r  getting dataset_}
+library("readxl")
+dataset <- read_excel("/Users/yihyunkim/desktop/train-1.xlsx")
+data.table(dataset)
+```
+
+## Exploratory Analysis
+
+```{r}
+colSums(is.na(dataset))
+
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+
+```{r}
+summary(dataset)
+```
+
+```{r data type }
+str(dataset)
+```
+
+```{r corr analyis}
+library(corrplot)
+
+M<-cor(dataset)
+corrplot(M, method="number")
+```
+
+X1&X2 and X4&X5 are highly negatively correlated. So i decided to remove X2 and X5 to prevent multicollinearity problem.
+
+
+```{r}
+library(caret)
+ctrl=trainControl(method='cv',number=10) # cv 10-fold
+ctrl_2=trainControl(method='cv',number=5) # cv 5-fold
+
+ctrl_3=trainControl(method='LOOVCV') # LEAVE ONE OUT CV
+
+```
+
+Cross-validation idea is used.
+
+# MODEL TRAINING
+
+## Linear Regression
+```{r}
+set.seed(425)
+fit=train(Y1~.-X2-X5, data=dataset, method="lm", metric="RMSE",trControl = ctrl_2)
+fit$results
+
+```
+```{r}
+summary(fit)
+```
+
+```{r}
+fit$finalModel
+```
+
+
+
+
+## Polynomial Regression
+
+```{r}
+dataset_t <- data.table(dataset)
+dataset_poly<-dataset_t[, ':='(X11=X1*X1,X22=X2*X2,X33=X3*X3,X44=X4*X4,X55=X5*X5,X66=X6*X6,X77=X7*X7,X88=X8*X8,X111=X1*X1*X1,X222=X2*X2*X2,X333=X3*X3*X3,X444=X4*X4*X4,X555=X5*X5*X5,X666=X6*X6*X6,X777=X7*X7*X7,X888=X8*X8*X8)]
+```
+
+
+```{r}
+fit=train(Y1~., data=dataset_poly, method="lm", metric="RMSE",trControl = ctrl_2)
+fit$results
+```
+
+
+```{r}
+summary(fit)
+```
+
+```{r}
+set.seed(425)
+fit=train(Y1~., data=dataset_poly, method="lmStepAIC", metric="RMSE",trControl = ctrl_2)
+fit$results
+```
+
+```{r}
+summary(fit)
+```
+
+## Linear Regression with Backwards Selection
+
+```{r , warning=FALSE, message=FALSE}
+grid <- expand.grid(nvmax=c(2,3,4,5,6))
+fit=train(Y1~., data=dataset, method="leapBackward",tuneGrid=grid, metric="RMSE",trControl = ctrl_2)
+fit$results
+```
+
+
+```{r}
+summary(fit)
+```
+
+```{r}
+coef(fit$finalModel, 7)
+
+```
+
+## Linear Regression with Forwards Selection
+
+```{r, warning=FALSE, message=FALSE}
+grid <- expand.grid(nvmax=c(2,3,4,5,6))
+
+fit=train(Y1~., data=dataset, method="leapForward",tuneGrid=grid, metric="RMSE",trControl = ctrl_2)
+fit$results
+```
+
+```{r}
+summary(fit)
+```
+
+
+```{r}
+fit$finalModel
+```
+
+```{r}
+coef(fit$finalModel, 7)
+
+```
+
+## Linear Regression with Stepwise Selection
+
+```{r , warning=FALSE,message=FALSE}
+
+fit=train(Y1~., data=dataset, method="leapSeq", metric="RMSE",tuneLength=5,trControl = ctrl_2) # adjust nvmax parameter
+fit$results
+```
+
+```{r}
+summary(fit)
+```
+
+```{r}
+coef(fit$finalModel, 7)
+
+```
+
+
+## Linear Regression with Stepwise Selection  *
+
+```{r}
+set.seed(425)
+fit=train(Y1~., data=dataset, method="lmStepAIC", metric="RMSE",trControl = ctrl_2)
+fit$results
+```
+
+```{r}
+summary(fit)
+```
+
+```{r}
+coef(fit$finalModel, 7)
+
+```
+
+# ridge regression
+
+```{r glmnet package}
+fit=train(Y1~., data=dataset, method="glmnet", metric="RMSE",tuneLength=5,trControl = ctrl_2)
+fit$results
+```
+
+
+```{r}
+fit=train(Y1~., data=dataset, method="ridge", metric="RMSE",tuneLength=5,trControl = ctrl_2)
+fit$results
+```
+
+
+```{r}
+summary(fit)
+```
+
+
+```{r}
+coef(fit$finalModel,fit$bestTune$lambda)
+
+```
+
+
+
+# LASSO
+
+
+```{r}
+library("elasticnet")
+fit=train(Y1~., data=dataset, method="lasso", metric="RMSE",tuneLength=5,trControl = ctrl_2) # lasso deals with multicollinearity
+fit$results
+```
+
+```{r}
+coef(fit$finalModel)
+```
+
+```{r}
+#summary(fit)
+```
+
+
+
+# gradient boosting machine
+
+```{r}
+fit=train(Y1~., data=dataset, method="gbm", metric="RMSE",tuneLength=5,trControl = ctrl_2)
+fit$results
+```
+
+
+```{r}
+summary(fit)
+```
+# Bayesian Regularized Neural Networks
+
+```{r}
+
+fit=train(Y1~., data=dataset, method="brnn", metric="RMSE",tuneLength=10,trControl = ctrl_2)
+fit$results
+```
+
+
+
+```{r}
+summary(fit)
+```
